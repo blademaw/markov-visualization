@@ -50,7 +50,14 @@ class Queue {
       rear--;
     } 
     return;
-  } 
+  }
+  
+  // clear the queue
+  void clear() {
+    while (this.rear > 0) {
+      this.queueDequeue();
+    }
+  }
 
   // print queue elements 
   void queueDisplay() 

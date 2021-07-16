@@ -4,9 +4,9 @@
  On date:
  14-Jul-2021
  Last updated on:
- 14-Jul-2021
- Purpose & intent:
- * attempt at binary heat map, key signature, and splitting keys
+ 16-Jul-2021
+ Purpose:
+   visualization of Markov model
  */
 
 import java.util.*;
@@ -20,11 +20,11 @@ OscP5 oscRec;
 PFont f;
 int notesStored, lastNotes, ARR_SIZE;
 float inAvg, outAvg;
-boolean post;
+boolean post, splitKey;
 String histIn, histOut, keySig;
 String[] lastArray, lastOutArray;
 String[] noteToText = {"C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"};
-Queue queue = new Queue(30); // averaging notes per second over every 30 seconds
+Queue queue = new Queue(30); // averaging notes per second over every 30 last received chunks
 
 void setup() {
   size(1000, 600); // 1000x600 works well, other sizes are WIP
@@ -53,6 +53,7 @@ void setup() {
   histIn = "";
   histOut = "";
   keySig = "None";
+  splitKey = true;
 }
 
 void draw() {
@@ -92,7 +93,23 @@ void mouseClicked() {
  * Pressing a key will toggle the 'post-analysis' which displays the performance gradient heat map
  */
 void keyPressed() {
-  post = !post;
+  switch (key) {
+    case 'p': // toggle post analysis
+      post = !post;
+      break;
+    case 's': // split the keys
+      splitKey = !splitKey;
+      break;
+    case 'c': // clear session
+      queue.clear();
+      histIn = "";
+      histOut = "";
+      notesStored = 40;
+      lastNotes = 0;
+      keySig = "None";
+      keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, histIn.split("-").length));
+      keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, histOut.split("-").length));
+  }
 }
 
 /**
@@ -159,6 +176,10 @@ int[] getFrequenciesFromMidiString(String midi, int notesTake) {
   int[] notesFreq = new int[88];
   for (int i=0; i<88; i++) { // initializing frequency array to 0
     notesFreq[i] = 0;
+  }
+  
+  if (midi == "" || notesTake == 0) {
+    return notesFreq;
   }
 
   String[] noteArray = midi.replaceAll("(0,)*", "").replaceAll(",", "").split("-"); // array of just notes
@@ -308,4 +329,12 @@ float HueToRGB(float p, float q, float h)
   }
 
   return p;
+}
+
+/**
+ * Returns scaled version of probability based on exponential rise function
+*/
+float getLume(double prob) {
+  return ((2/(1+ (float) Math.exp(-12*prob))) - 1.0);
+  //return ((1/(1+ (float) Math.exp(-12*(prob-.3)))));
 }

@@ -67,8 +67,8 @@ class PianoKey {
     rect(x, y, keyWidth, keyHeight);
     
     if (this.split) {
-      // overlay split key
-      colArray = toRGB(230, 100, 60, 1.0f);
+      // overlay split key in blue
+      colArray = toRGB(230, 100, 100 - ((getLume(this.inProb)*55) + 20), 1.0f);
       fill(colArray[0], colArray[1], colArray[2]);
       triangle(x, y, x + keyWidth, y, x, y + keyHeight);
     }
@@ -79,20 +79,23 @@ class PianoKey {
     float[] cols = toRGB(0, 100, 100, 1); // white
     if (this.inProb > 0 && this.outProb == 0) {
       // pure user input, blue color
-      cols = toRGB(230, 100, 60, 1.0f); // binary heatmap; pure blue
+      cols = toRGB(230, 100, 100 - ((getLume(this.inProb)*55) + 20), 1.0f);
     } else if (this.outProb > 0 && this.inProb == 0) {
       // pure system input, orange color
-      cols = toRGB(39, 100, 50, 1.0f); // binary heatmap; pure orange
+      cols = toRGB(39, 100, 100 - ((getLume(this.outProb)*55) + 20), 1.0f);
     } else if (this.inProb > 0 && this.outProb > 0) {
       // both system and user input
-      cols = toRGB(39, 100, 50, 1.0f); // color rect orange, triangle blue
-      this.split = true;
+      if (splitKey) {
+        cols = toRGB(39, 100, 100 - ((getLume(this.outProb)*55) + 20), 1.0f); // color rect orange, triangle blue
+        this.split = true;
+      } else {
+        cols = toRGB(0, 100, 100 - ((getLume(this.inProb + this.outProb)*55) + 20), 1.0f); // total as one key
+      }
     } else {
-      cols = new float[] {255, 255, 255};
-      // color black keys slightly darker than white
+      cols = new float[] {255, 255, 255}; // default color
       for (int bKey : keyboard.blackKeys) {
         if (id == bKey) {
-          cols = new float[] {204, 204, 204};
+          cols = new float[] {204, 204, 204}; // slightly darker
         }
       }      
     }
