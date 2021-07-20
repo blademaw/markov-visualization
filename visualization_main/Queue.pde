@@ -91,6 +91,6 @@ class Queue {
   }
   
   int getLength() {
-    return rear + 1;
+    return rear;
   }
 } 

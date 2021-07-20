@@ -4,9 +4,9 @@
  On date:
  14-Jul-2021
  Last updated on:
- 16-Jul-2021
+ 20-Jul-2021
  Purpose:
-   visualization of Markov model
+ visualization of Markov model
  */
 
 import java.util.*;
@@ -14,20 +14,22 @@ import java.awt.Color;
 import oscP5.*;
 import netP5.*;
 import grafica.*;
+import themidibus.*;
 
 Keyboard keyboard;
-OscP5 oscRec;
+OscP5 oscRec; 
 PFont f;
-int notesStored, lastNotes, ARR_SIZE;
-float inAvg, outAvg;
-boolean post, splitKey;
+int notesStored, lastNotes, ARR_SIZE, intervalTime, prevTime, secNotes;
+float inAvg, outAvg; // average notes/sec human, and system
+boolean post, splitKey, midiRec;
 String histIn, histOut, keySig;
 String[] lastArray, lastOutArray;
 String[] noteToText = {"C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"};
-Queue queue = new Queue(30); // averaging notes per second over every 30 last received chunks
+Queue queue = new Queue(30); // averaging notes per second over every 30 last received chunks/seconds
+MidiBus inBus, outBus; // two MidiBusses for receiving input from user and output from system
 
 void setup() {
-  size(1000, 600); // 1000x600 works well, other sizes are WIP
+  size(1000, 600); // TODO: make this adaptable to any screen size
   strokeWeight(1);
   f = createFont("Arial", 16, true);
 
@@ -45,15 +47,24 @@ void setup() {
   oscRec.plug(this, "inputReceive", "/InputMemory"); // plugging the two current note OSC messages
   oscRec.plug(this, "outputReceive", "/OutputMemory");
 
-  //notesStored = 40; // to be parameterized
-  post = false;
-  lastNotes = 0;
-  notesStored = 40;
-  ARR_SIZE = 250;
-  histIn = "";
-  histOut = "";
-  keySig = "None";
-  splitKey = true;
+  // setting up MidiBus
+  inBus = new MidiBus(this, 1, 0, "input"); // currently takes fixed VMPK output
+  outBus = new MidiBus(this, 0, 0, "output"); // currently takes fixed Bus 1 output
+
+  post = false; // toggle post analysis
+  lastNotes = 0; // notes recieved last OSC tick
+  notesStored = 40; // notes to create ongoing/real-time visualization
+  ARR_SIZE = 250; // OSC array message size
+  histIn = ""; // performance input string
+  histOut = ""; // performance output string
+  keySig = "None"; // best-guess key signature
+  splitKey = true; // toggle split key
+  midiRec = false; // toggle midi/osc
+
+  // midi mode variables
+  intervalTime = 1000; // recieve notes per _second_
+  prevTime = 0;
+  secNotes = 0; // number of notes recieved in past second
 }
 
 void draw() {
@@ -77,46 +88,98 @@ void draw() {
   fill(255, 206, 162); // fill RGB values
   rect(4*height/5, 4*height/6 + height/7 + height/18 + 4*height/75, 15, 15);
 
-  println("in: " + histIn);
-  println("out: " + histOut);
+  // indicator message (to be made prettier)
+  fill(0);
+  if (midiRec) {
+    text("Mode: MIDI", height/20, height/20);
+  } else {
+    text("Mode: OSC", height/20, height/20);
+  }
+
+  //println("in: " + histIn);
+  //println("out: " + histOut);
+
+  // midi loop
+  if (midiRec) {
+    // handle logic for updating notesStored, clocks every second
+    if (millis() > prevTime + intervalTime)
+    {
+      // adding notesStored to queue
+      if (secNotes == 0 && queue.getLength() == 0) {
+        // hasn't started playing yet, don't add
+      } else {
+        queue.queueEnqueue(secNotes);
+      }
+      secNotes = 0; // resetting notes this second
+
+      // update notesStored with sufficient input
+      if (queue.getLength() == 30) {
+        //println("This is getting triggered");
+        notesStored = 10 + Math.round(20*(queue.getAvg())); // updating notes stored
+      }
+
+      queue.queueDisplay();
+      prevTime = millis();
+    }
+
+    int currentNoteTake = 0;
+    if (post) {
+      currentNoteTake = Math.max(histIn.split("-").length, histOut.split("-").length);
+    } else { 
+      currentNoteTake = notesStored;
+    }
+
+    keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, currentNoteTake));
+    keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, currentNoteTake));
+  }
 }
 
 /**
  * Clicking the mouse toggles empirical probability labels beneath keys.
- * Currently outdated as there are too many keys for clean labels.
  */
 void mouseClicked() {
   keyboard.toggleNumbers();
 }
 
 /**
- * Pressing a key will toggle the 'post-analysis' which displays the performance gradient heat map
+ * Controls for visualization
  */
 void keyPressed() {
   switch (key) {
-    case 'p': // toggle post analysis
-      post = !post;
-      break;
-    case 's': // split the keys
-      splitKey = !splitKey;
-      break;
-    case 'c': // clear session
-      queue.clear();
-      histIn = "";
-      histOut = "";
-      notesStored = 40;
-      lastNotes = 0;
-      keySig = "None";
-      keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, histIn.split("-").length));
-      keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, histOut.split("-").length));
+  case 'p': // toggle post analysis
+    post = !post;
+    break;
+  case 's': // split the keys
+    splitKey = !splitKey;
+    break;
+  case 'm': // toggle midi/osc
+    midiRec = !midiRec;
+    clearProgram();
+    break;
+  case 'c': // clear session
+    clearProgram();
   }
+}
+
+/**
+ * Function to clear all of program's memory
+ */
+void clearProgram() {
+  queue.clear();
+  histIn = "";
+  histOut = "";
+  notesStored = 40;
+  lastNotes = 0;
+  keySig = "None";
+  keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, histIn.split("-").length));
+  keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, histOut.split("-").length));
 }
 
 /**
  * Updates amount of notes taken as sample in visualization to display heatmap
  */
 void updateNotesStored(String[] noteVals) {
-  // adjusting notes stored (only if at least 30 seconds of data)
+  // adjusting notes stored (only if we have at least 30 seconds of data)
   String[] newNotes = noteVals[ARR_SIZE-1].split("-"); // array of notes in last chunk (gain of message transmitted)
 
   if (Arrays.equals(noteVals, lastArray)) { // if no input, add 0 to notes queue
@@ -140,7 +203,6 @@ void updateNotesStored(String[] noteVals) {
  * to update key signature (right now just takes most frequent note)
  */
 void updateKeySig(int[] notesFreq) {
-  // taking in frequencies as fixed length makes this O(1) as opposed to O(notesStored)
   int[] octaveFreq = new int[12];
   for (int i=0; i<12; i++) {
     // for each note
@@ -151,12 +213,11 @@ void updateKeySig(int[] notesFreq) {
       octaveFreq[i] += notesFreq[noteInd]; // increment by note, octave
     }
   }
+  // manually incrementing keys not in the loop
   octaveFreq[9] += notesFreq[0]; // A0
   octaveFreq[10] += notesFreq[1]; // Bb0
   octaveFreq[11] += notesFreq[2]; // B0
   octaveFreq[0] += notesFreq[87]; // C8
-
-  //println("octave count: " + Arrays.toString(octaveFreq));
 
   // getting most frequent note
   int maxNote = 0;
@@ -174,15 +235,16 @@ void updateKeySig(int[] notesFreq) {
  */
 int[] getFrequenciesFromMidiString(String midi, int notesTake) {
   int[] notesFreq = new int[88];
-  for (int i=0; i<88; i++) { // initializing frequency array to 0
+  for (int i=0; i<88; i++) {
     notesFreq[i] = 0;
   }
-  
+
   if (midi == "" || notesTake == 0) {
+    // if no notes, no frequencies
     return notesFreq;
   }
 
-  String[] noteArray = midi.replaceAll("(0,)*", "").replaceAll(",", "").split("-"); // array of just notes
+  String[] noteArray = midi.replaceAll("(0,)*", "").replaceAll(",", "").split("-"); // get array of just notes
   String[] noteVals = Arrays.copyOfRange(noteArray, Math.max(0, noteArray.length-notesTake), noteArray.length); // take last <notesStored> notes
 
   // increment in frequency array, adjusting for MIDI values
@@ -191,17 +253,36 @@ int[] getFrequenciesFromMidiString(String midi, int notesTake) {
   }
 
   // with array of notes of length notesStored, try to figure out key signature
-  updateKeySig(notesFreq); // important to note this is triggered for output
+  updateKeySig(notesFreq); // also called during output
 
   return notesFreq;
 }
 
 /**
+ * Recieve midi input if note is played (either by input/output)
+ */
+void noteOn(int channel, int pitch, int velocity, long timestamp, String bus_name) {
+  if (!midiRec) { 
+    return;
+  }
+
+  if (bus_name == "input") {
+    histIn += String.valueOf(pitch) + "-";
+    secNotes++;
+  } else if (bus_name == "output") {
+    histOut += String.valueOf(pitch) + "-";
+  } else { 
+    println("Unknown bus encountered when recieving note.");
+  }
+}
+
+/**
  * Receives input from user input OSC message '/InputMemory'
- * <p>
- * Input must be in the format: string of leading 0s + integer midi values separated by '-'
  */
 void inputReceive(String inMemory) {
+  if (midiRec) { 
+    return;
+  }
   // this is clocked every second from the system
   //println("OSC Message triggered");
 
@@ -235,6 +316,10 @@ void inputReceive(String inMemory) {
  * Output string must be in the format: string of leading 0s + integer midi values separated by '-'
  */
 void outputReceive(String outMemory) {
+  if (midiRec) { 
+    return;
+  }
+
   String[] noteVals = outMemory.replaceAll("(0,)*", "").replaceAll(",", "").split("-"); // array of just notes
   //println("output " + Arrays.toString(noteVals)); // outputs notes
 
@@ -333,7 +418,7 @@ float HueToRGB(float p, float q, float h)
 
 /**
  * Returns scaled version of probability based on exponential rise function
-*/
+ */
 float getLume(double prob) {
   return ((2/(1+ (float) Math.exp(-12*prob))) - 1.0);
   //return ((1/(1+ (float) Math.exp(-12*(prob-.3)))));
