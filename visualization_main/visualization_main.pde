@@ -4,9 +4,9 @@
  On date:
  14-Jul-2021
  Last updated on:
- 22-Jul-2021
+ 23-Jul-2021
  Purpose:
- experiment further with Markov system visualizations
+ experiment further with Markov system visualisations
  */
 
 import java.util.*;
@@ -15,25 +15,34 @@ import oscP5.*;
 import netP5.*;
 import grafica.*;
 import themidibus.*;
+import controlP5.*;
 
 Keyboard keyboard;
 OscP5 oscRec; 
+ControlP5 cp5;
+RadioButton recModeButton, visButton;
+CheckBox midiModeBox, optionsBox;
 PFont f;
-int notesStored, lastNotes, ARR_SIZE, intervalTime, prevTime, secNotes, vis;
+int notesStored, lastNotes, ARR_SIZE, intervalTime, prevTime, secNotes, vis, bgCol;
 float inAvg, outAvg; // average notes/sec human, and system
-boolean post, splitKey, midiRec, graphVis;
+boolean post, splitKey, midiRec, graphVis, debugMode, opDisplay, disKeySig, disMovAvg;
 String histIn, histOut, keySig;
 String[] lastArray, lastOutArray;
 String[] noteToText = {"C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"};
 Queue queue = new Queue(30); // averaging notes per second over every 30 last received chunks/seconds
-MidiBus inBus, outBus; // two MidiBusses for receiving input from user and output from system
+MidiBus outBus; // two MidiBusses for receiving input from user and output from system
 GPlot plot, plot1; // two plots (hist, line)
 GPointsArray points, pointsOut;
 
 void setup() {
-  size(1000, 600); // TODO: make this adaptable to any screen size
+  size(1000, 600);
   strokeWeight(1);
   f = createFont("Arial", 16, true);
+
+  debugMode = false; // change this to run program in debug mode
+
+  // control P5 GUI
+  cp5 = new ControlP5(this);
 
   // initialize virtual piano
   keyboard = new Keyboard();
@@ -48,14 +57,29 @@ void setup() {
   oscRec.plug(this, "inputReceive", "/InputMemory"); // plugging the two current note OSC messages
   oscRec.plug(this, "outputReceive", "/OutputMemory");
 
+  if (debugMode) {
+    println("Available MIDI Devices:"); 
+
+    System.out.println("----------Input (from availableInputs())----------");
+    String[] available_inputs = MidiBus.availableInputs(); //Returns an array of available input devices
+    for (int i = 0; i < available_inputs.length; i++) System.out.println("["+i+"] \""+available_inputs[i]+"\"");
+
+    System.out.println("----------Output (from availableOutputs())----------");
+    String[] available_outputs = MidiBus.availableOutputs(); //Returns an array of available output devices
+    for (int i = 0; i < available_outputs.length; i++) System.out.println("["+i+"] \""+available_outputs[i]+"\"");
+
+    System.out.println("----------Unavailable (from unavailableDevices())----------");
+    String[] unavailable = MidiBus.unavailableDevices(); //Returns an array of unavailable devices
+    for (int i = 0; i < unavailable.length; i++) System.out.println("["+i+"] \""+unavailable[i]+"\"");
+  }
+
   // setting up MidiBus & midi values
-  inBus = new MidiBus(this, 1, 0, "input"); // currently takes fixed VMPK output
-  outBus = new MidiBus(this, 0, 0, "output"); // currently takes fixed Bus 1 output
-  intervalTime = 1000; // recieve notes per _second_
+  outBus = new MidiBus(this, 1, 0, "output"); // device 2 should be IAC Bus 2, system/user are diff. channels
+  intervalTime = 1000; // recieve notes per second (1000ms)
   prevTime = 0;
   secNotes = 0; // number of notes recieved in past second
 
-  // setting up graph visualizations
+  // setting up graph visualisations
   int nPoints = 88; // 88 keys
   points = new GPointsArray(nPoints);
   pointsOut = new GPointsArray(nPoints);
@@ -73,8 +97,6 @@ void setup() {
   plot.setLineColor(color(178, 206, 252));
   plot.addLayer("layer 1", pointsOut);
   plot.startHistograms(GPlot.VERTICAL);
-  //plot.getLayer("layer 1").setLineColor(color(255, 206, 162));
-  //plot.getYAxis().setAxisLabelText("probability");
 
   // second line for system input
   plot1 = new GPlot(this);
@@ -87,7 +109,7 @@ void setup() {
   // setting initial global variables
   post = false; // toggle post analysis
   lastNotes = 0; // notes recieved last OSC tick
-  notesStored = 40; // notes to create ongoing/real-time visualization
+  notesStored = 40; // notes to create ongoing/real-time visualisation
   ARR_SIZE = 250; // OSC array message size
   histIn = ""; // performance input string
   histOut = ""; // performance output string
@@ -95,40 +117,104 @@ void setup() {
   splitKey = true; // toggle split key
   graphVis = false;
   midiRec = false; // toggle midi/osc
-  vis = 1; // which graph visualization to display
+  vis = 1; // which graph visualisation to display
+  bgCol = 150; // initial (grey) background color
+  opDisplay = false; // don't display options box by default
+  disKeySig = false; // don't display key signature by default
+  disMovAvg = false; // don't display moving averages by default
+
+  // GUI options
+  recModeButton = cp5.addRadioButton("radioButton")
+    .setPosition(6.25*width/24, 20.5*height/24)
+    .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
+    .setColorForeground(150)
+    .setColorActive(color(160, 0, 0))
+    .setColorLabel(155)
+    .setItemsPerRow(1)
+    .setSpacingColumn(5)
+    .addItem("Graph", 0)
+    .addItem("Keyboard", 1);
+
+  for (Toggle t : recModeButton.getItems()) {
+    t.getCaptionLabel().setColorBackground(255);
+    t.getCaptionLabel().getStyle().moveMargin(-7, 0, 0, -3);
+    t.getCaptionLabel().getStyle().movePadding(7, 0, 0, 3);
+    t.getCaptionLabel().getStyle().backgroundWidth = 45;
+    t.getCaptionLabel().getStyle().backgroundHeight = 13;
+  }
+  recModeButton.activate(1);
+
+  visButton = cp5.addRadioButton("radioButton2")
+    .setPosition(8.25*width/24, 20.5*height/24)
+    .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
+    .setColorForeground(150)
+    .setColorActive(color(160, 0, 0))
+    .setColorLabel(155)
+    .setItemsPerRow(1)
+    .setSpacingColumn(5)
+    .addItem("1", 0)
+    .addItem("2", 1)
+    .addItem("3", 2);
+  visButton.activate(1);
+
+  for (Toggle t : visButton.getItems()) {
+    t.getCaptionLabel().setColorBackground(255);
+    t.getCaptionLabel().getStyle().moveMargin(-7, 0, 0, -3);
+    t.getCaptionLabel().getStyle().movePadding(7, 0, 0, 3);
+    t.getCaptionLabel().getStyle().backgroundWidth = 45;
+    t.getCaptionLabel().getStyle().backgroundHeight = 13;
+  }
+
+  midiModeBox = cp5.addCheckBox("checkBox")
+    .setPosition(6.25*width/24, 22.25*height/24)
+    .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
+    .setItemsPerRow(1)
+    .setSpacingColumn(30)
+    .setSpacingRow(20)
+    .addItem("MIDI", 1)
+    ;
+
+  optionsBox = cp5.addCheckBox("checkBox2")
+    .setPosition(11.25*width/24, 20.5*height/24)
+    .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
+    .setItemsPerRow(3)
+    .setSpacingColumn(2*width/24)
+    .setSpacingRow((int) (.75*height)/24)
+    .addItem("Split keys", 1)
+    .addItem("Post-analysis", 1)
+    .addItem("Key signature", 1)
+    .addItem("Frequency labels", 1)
+    .addItem("Moving averages", 1)
+    ;
+  optionsBox.activate(0);
+  optionsBox.activate(2);
+  optionsBox.activate(4);
 }
 
 void draw() {
-  background(150); // resetting so text (if displayed) is cleared
+  background(bgCol); // resetting so text (if displayed) is cleared
   keyboard.display();
 
-  // lower-left info box
-  fill(255);
-  textFont(f, (width+height)/85);
-  rect(height/24, 19*height/24, 9*height/24, 4*height/24 + 5); // box
-  fill(0);
-  if (!post) { 
-    text("Notes stored: "+notesStored, 2*height/24, 20*height/24);
+  drawLegend();
+  if (opDisplay) {
+    drawOptionBox();
+    recModeButton.show();
+    visButton.show();
+    midiModeBox.show();
+    optionsBox.show();
   } else {
-    text("Total notes: " + (histIn.split("-").length + histOut.split("-").length - 2), 2*height/24, 20*height/24);
+    recModeButton.hide();
+    visButton.hide();
+    midiModeBox.hide();
+    optionsBox.hide();
   }
-  text(" human", 3*height/24, 21*height/24);
-  text(" system", 3*height/24, 22*height/24);
-  if (!splitKey) {
-    text(" both", 3*height/24, 23*height/24);
-    fill(255, 41, 41); // red
-    rect(2*height/24, 22.5*height/24, .5*height/24, .5*height/24);
-  }
-  fill(245, 159, 0); // orange
-  rect(2*height/24, 20.5*height/24, .5*height/24, .5*height/24);
-  fill(41, 77, 255); // fill RGB values
-  rect(2*height/24, 21.5*height/24, .5*height/24, .5*height/24);
+
 
   fill(0);
-  if (graphVis) {
+  if (graphVis && disKeySig) {
     textFont(f, (width+height)/60);
     text("I think you're playing in " + keySig, width/2, 15*height/20);
-  } else {
+  } else if (!graphVis && disKeySig) {
     textFont(f, (width+height)/50);
     text("I think you're playing in " + keySig, height/16, 2*height/6 - height/75);
   }
@@ -140,6 +226,8 @@ void draw() {
     rect(height/20, 1.2*height/20, 4*height/20, height/20);
     fill(0);
     text("Post-Analysis", 1.1*height/20, 2.25*height/24);
+
+    fill(255);
   }
 
   // mode indicator message
@@ -150,8 +238,10 @@ void draw() {
     text("Mode: OSC", height/20, height/20);
   }
 
-  //println("in: " + histIn);
-  //println("out: " + histOut);
+  if (debugMode) {
+    println("in: " + histIn);
+    println("out: " + histOut);
+  }
 
   // midi loop
   if (midiRec) {
@@ -191,14 +281,101 @@ void draw() {
 }
 
 /**
- * Clicking the mouse toggles empirical probability labels beneath keys.
+ * Draws legend
  */
-void mouseClicked() {
-  keyboard.toggleNumbers();
+void drawLegend() {
+  // lower-left legend
+  fill(255);
+  textFont(f, (width+height)/85);
+  rect(width/24, 19*height/24, 5*width/24, 4*height/24 + 5); // box
+  fill(0);
+  if (!post) { 
+    text("Notes stored: "+notesStored, 1.5*width/24, 20*height/24);
+  } else {
+    text("Total notes: " + (histIn.split("-").length + histOut.split("-").length - 2), 1.5*width/24, 20*height/24);
+  }
+  text(" human", 2.5*width/24, 21*height/24);
+  text(" system", 2.5*width/24, 22*height/24);
+  if (!splitKey) {
+    text(" both", 2.5*width/24, 23*height/24);
+    fill(255, 41, 41); // red
+    rect(1.5*width/24, 22.5*height/24, .5*width/24, .5*height/24);
+  }
+  fill(245, 159, 0); // orange
+  rect(1.5*width/24, 20.5*height/24, .5*width/24, .5*height/24);
+  fill(41, 77, 255); // fill RGB values
+  rect(1.5*width/24, 21.5*height/24, .5*width/24, .5*height/24);
 }
 
 /**
- * Controls for visualization
+ * Draws options box if necessary
+ */
+void drawOptionBox() {
+  fill(bgCol-10);
+  rect(6*width/24, 19*height/24, 17*width/24, 4*height/24 + 5); // box
+
+  fill(0);
+  text("Modes", 6.25*width/24, 20.05*height/24);
+  text("Visualisation", 8.25*width/24, 20.05*height/24);
+  text("Options", 11.25*width/24, 20.05*height/24);
+}
+
+/**
+ * Receive events from ControlP5 elements
+ */
+void controlEvent(ControlEvent theEvent) {
+  if (theEvent.isFrom(recModeButton)) {
+    if (theEvent.getValue() == 0) { // toggle graph/keyboard
+      graphVis = true;
+    } else { 
+      graphVis = false;
+    }
+  } else if (theEvent.isFrom(visButton)) {
+    vis = (int) theEvent.getValue(); // select graph vis based on radio button
+  } else if (theEvent.isFrom(midiModeBox)) { // toggle midi/osc
+    if (midiModeBox.getArrayValue()[0] == 1) {
+      midiRec = true;
+      clearProgram();
+    } else {
+      midiRec = false;
+      clearProgram();
+    }
+  } else if (theEvent.isFrom(optionsBox)) { // extra options
+    float[] optionsList = optionsBox.getArrayValue();
+    if (optionsList[0] == 1) {
+      splitKey = true;
+    } else {
+      splitKey = false;
+    }
+
+    if (optionsList[1] == 1) { // post-analysis
+      post = true;
+    } else {
+      post = false;
+    }
+
+    if (optionsList[2] == 1) { // key signature
+      disKeySig = true;
+    } else {
+      disKeySig = false;
+    }
+
+    if (optionsList[3] == 1) { // frequency labels
+      keyboard.toggleNumbers(true);
+    } else {
+      keyboard.toggleNumbers(false);
+    }
+
+    if (optionsList[4] == 1) { // moving average
+      disMovAvg = true;
+    } else {
+      disMovAvg = false;
+    }
+  }
+}
+
+/**
+ * Controls for visualisation
  */
 void keyPressed() {
   switch (key) {
@@ -215,11 +392,20 @@ void keyPressed() {
   case 'c': // clear session
     clearProgram();
     break;
-  case 'g': // toggle visualization mode
+  case 'g': // toggle visualisation mode
     graphVis = !graphVis;
     break;
   case 'v': // change graph
     vis++;
+    break;
+  case 'i':
+    bgCol += 5;
+    break;
+  case 'd':
+    bgCol -= 5;
+    break;
+  case ' ':
+    opDisplay = !opDisplay;
     break;
   }
 }
@@ -235,12 +421,12 @@ void clearProgram() {
   lastNotes = 0;
   keySig = "—";
   vis = 1;
-  keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, histIn.split("-").length));
-  keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, histOut.split("-").length));
+  keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, 0));
+  keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, 0));
 }
 
 /**
- * Updates amount of notes taken as sample in visualization to display heatmap
+ * Updates amount of notes taken as sample in visualisation to display heatmap
  */
 void updateNotesStored(String[] noteVals) {
   // adjusting notes stored (only if we have at least 30 seconds of data)
@@ -248,17 +434,19 @@ void updateNotesStored(String[] noteVals) {
 
   if (Arrays.equals(noteVals, lastArray)) { // if no input, add 0 to notes queue
     queue.queueEnqueue(0);
-    println("no new input");
+    if (debugMode) { 
+      println("no new input");
+    }
   } else {
     queue.queueEnqueue(newNotes.length); // adding most recent amt of notes (in this one second)
   }
 
-  //println("New notes: " + newNotes);
-  //queue.queueDisplay(); // debugging
+  if (debugMode) {
+    println("New notes: " + newNotes + ". Queue:");
+    queue.queueDisplay(); // debugging
+  }
   lastArray = noteVals;
-  //println(queue.getLength());
   if (queue.getLength() >= 30) { // if we have sufficient input
-    //println("This is getting triggered");
     notesStored = 10 + Math.round(20*(queue.getAvg())); // updating notes stored
   }
 }
@@ -292,7 +480,7 @@ void updateKeySig(int[] notesFreq) {
   }
 
   keySig = noteToText[maxNote]; // updating text
-  
+
   // checking frequency of third to guess major/minor
   if (octaveFreq[(maxNote+3)%12] > octaveFreq[(maxNote+4)%12]) {
     // if third is normally flat
@@ -338,15 +526,31 @@ void noteOn(int channel, int pitch, int velocity, long timestamp, String bus_nam
     return;
   }
 
-  if (bus_name == "input") {
+  if (channel == 1) {
+    // this is human input
     histIn += String.valueOf(pitch) + "-";
     secNotes++;
-  } else if (bus_name == "output") {
+  } else if (channel == 0) {
+    // system output
     histOut += String.valueOf(pitch) + "-";
   } else { 
-    println("Unknown bus encountered when recieving note.");
+    println("Unknown channel encountered when recieving note.");
   }
 }
+
+/**
+ * Function to act on controller changes by the system
+ */
+void controllerChange(int channel, int number, int value, long timestamp, String bus_name) {
+  // triggers for both OSC Mode and MIDI
+  switch (number) {
+  case 32: // cycling through visualisations
+    vis++;
+  case 123: // resetting system & clearing memory
+    clearProgram();
+  }
+}
+
 
 /**
  * Receives input from user input OSC message '/InputMemory'
@@ -355,16 +559,14 @@ void inputReceive(String inMemory) {
   if (midiRec) { 
     return;
   }
-  // this is clocked every second from the system
-  //println("OSC Message triggered");
+  // this is clocked every second from the system with OSC enabled system-side
 
   String[] noteVals = inMemory.split(","); // splitting on chunks
-  //println(inMemory); // debugging
-  //println("len: " + noteVals.length);
-  //println("input " + Arrays.toString(noteVals));
 
   if (noteVals[ARR_SIZE-1].length() == 1 && (int) noteVals[ARR_SIZE-1].charAt(0) == 48) { // if no input memory do not try to access array
-    println("no input memory");
+    if (debugMode) {
+      println("no input memory");
+    }
     return;
   }
 
@@ -393,10 +595,11 @@ void outputReceive(String outMemory) {
   }
 
   String[] noteVals = outMemory.replaceAll("(0,)*", "").replaceAll(",", "").split("-"); // array of just notes
-  //println("output " + Arrays.toString(noteVals)); // outputs notes
 
   if (outMemory.replaceAll("(0,)*", "").replaceAll(",", "").length() == 1) { // no output memory (length 1)
-    println("no output memory");
+    if (debugMode) {
+      println("no output memory");
+    }
     return;
   }
 

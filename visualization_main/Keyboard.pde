@@ -72,6 +72,7 @@ class Keyboard {
       // display graphics
       displayGraphic();
     } else {
+      if (disMovAvg) {
       // showing moving average
       stroke(0, 0, 205);
       strokeWeight(15);
@@ -81,6 +82,7 @@ class Keyboard {
       point((width-PIANO_WIDTH)/2 + (outAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
       strokeWeight(1);
       stroke(0);
+      }
     }
   }
 
@@ -96,7 +98,7 @@ class Keyboard {
     for (int i=0; i < 88; i++) {
       float thisInFreq = keyArray[i].getInProb();
       float thisOutFreq = keyArray[i].getOutProb();
-      
+
       points.add(i, thisInFreq); // add each key
       pointsOut.add(i, thisOutFreq);
       // adjust for max Y axis
@@ -168,8 +170,12 @@ class Keyboard {
     }
   }
 
-  void toggleNumbers() {
-    numbersOn = !numbersOn;
+  void toggleNumbers(boolean status) {
+    if (status) {
+      numbersOn = true;
+    } else { 
+      numbersOn = false;
+    }
   }
 
   void updateInFreqs(int[] freq) {
