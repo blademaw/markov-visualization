@@ -62,21 +62,32 @@ class PianoKey {
   void drawKey() {
     // function to draw a piano key
     this.split = false;
-    float[] colArray = getProbColor(); // heat map just for user input?
-    fill(colArray[0], colArray[1], colArray[2]); // fill RGB values
-    rect(x, y, keyWidth, keyHeight);
+    float[] colArray = getProbColor();
+    fill(colArray[0], colArray[1], colArray[2]);
+    float dispX, dispY, dispKeyW, dispKeyH;
+    
+    if (graphVis) {
+      dispX = x;
+      dispY = 10.5*height/20;
+      dispKeyH = 2*keyHeight/3;
+    } else {
+      dispX = x;
+      dispY = y;
+      dispKeyH = keyHeight;
+    }
+    rect(dispX, dispY, keyWidth, dispKeyH);
     
     if (this.split) {
       // overlay split key in blue
       colArray = toRGB(230, 100, 100 - ((getLume(this.inProb)*55) + 20), 1.0f);
       fill(colArray[0], colArray[1], colArray[2]);
-      triangle(x, y, x + keyWidth, y, x, y + keyHeight);
+      triangle(dispX, dispY, dispX + keyWidth, dispY, dispX, dispY + dispKeyH);
     }
   }
 
   // function to retrieve color to set key to
   float[] getProbColor() {
-    float[] cols = toRGB(0, 100, 100, 1); // white
+    float[] cols = toRGB(0, 100, 100, 1); // white    
     if (this.inProb > 0 && this.outProb == 0) {
       // pure user input, blue color
       cols = toRGB(230, 100, 100 - ((getLume(this.inProb)*55) + 20), 1.0f);

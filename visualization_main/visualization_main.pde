@@ -4,9 +4,9 @@
  On date:
  14-Jul-2021
  Last updated on:
- 20-Jul-2021
+ 22-Jul-2021
  Purpose:
- visualization of Markov model
+ experiment further with Markov system visualizations
  */
 
 import java.util.*;
@@ -19,14 +19,16 @@ import themidibus.*;
 Keyboard keyboard;
 OscP5 oscRec; 
 PFont f;
-int notesStored, lastNotes, ARR_SIZE, intervalTime, prevTime, secNotes;
+int notesStored, lastNotes, ARR_SIZE, intervalTime, prevTime, secNotes, vis;
 float inAvg, outAvg; // average notes/sec human, and system
-boolean post, splitKey, midiRec;
+boolean post, splitKey, midiRec, graphVis;
 String histIn, histOut, keySig;
 String[] lastArray, lastOutArray;
 String[] noteToText = {"C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"};
 Queue queue = new Queue(30); // averaging notes per second over every 30 last received chunks/seconds
 MidiBus inBus, outBus; // two MidiBusses for receiving input from user and output from system
+GPlot plot, plot1; // two plots (hist, line)
+GPointsArray points, pointsOut;
 
 void setup() {
   size(1000, 600); // TODO: make this adaptable to any screen size
@@ -42,53 +44,105 @@ void setup() {
   op.setListeningPort(9001);
   op.setDatagramSize(150000); // sets maximum message length — need this or else UdpServer throws an error
   // 126,000 characters needed for 60 minutes of input, 10 notes per second, with 3.5 average character length of string
-
   oscRec = new OscP5(this, op);
   oscRec.plug(this, "inputReceive", "/InputMemory"); // plugging the two current note OSC messages
   oscRec.plug(this, "outputReceive", "/OutputMemory");
 
-  // setting up MidiBus
+  // setting up MidiBus & midi values
   inBus = new MidiBus(this, 1, 0, "input"); // currently takes fixed VMPK output
   outBus = new MidiBus(this, 0, 0, "output"); // currently takes fixed Bus 1 output
+  intervalTime = 1000; // recieve notes per _second_
+  prevTime = 0;
+  secNotes = 0; // number of notes recieved in past second
 
+  // setting up graph visualizations
+  int nPoints = 88; // 88 keys
+  points = new GPointsArray(nPoints);
+  pointsOut = new GPointsArray(nPoints);
+  plot = new GPlot(this);
+
+  // dimensions
+  float graphX = -width*.12;
+  float graphYMax = height/20;
+  float graphWidth = width*1.1;
+  float graphHeight = 8*height/20;
+
+  plot.setPos(graphX, graphYMax); // top-left corner
+  plot.setYLim(0, 1); // max 1 normalized frequency
+  plot.setDim(graphWidth, graphHeight);
+  plot.setLineColor(color(178, 206, 252));
+  plot.addLayer("layer 1", pointsOut);
+  plot.startHistograms(GPlot.VERTICAL);
+  //plot.getLayer("layer 1").setLineColor(color(255, 206, 162));
+  //plot.getYAxis().setAxisLabelText("probability");
+
+  // second line for system input
+  plot1 = new GPlot(this);
+  plot1.setPos(graphX, graphYMax);
+  plot1.setYLim(0, 1);
+  plot1.setDim(graphWidth, graphHeight);
+  plot1.setLineColor(color(255, 206, 162));
+  plot1.startHistograms(GPlot.VERTICAL);
+
+  // setting initial global variables
   post = false; // toggle post analysis
   lastNotes = 0; // notes recieved last OSC tick
   notesStored = 40; // notes to create ongoing/real-time visualization
   ARR_SIZE = 250; // OSC array message size
   histIn = ""; // performance input string
   histOut = ""; // performance output string
-  keySig = "None"; // best-guess key signature
+  keySig = "—"; // best-guess key signature
   splitKey = true; // toggle split key
+  graphVis = false;
   midiRec = false; // toggle midi/osc
-
-  // midi mode variables
-  intervalTime = 1000; // recieve notes per _second_
-  prevTime = 0;
-  secNotes = 0; // number of notes recieved in past second
+  vis = 1; // which graph visualization to display
 }
 
 void draw() {
   background(150); // resetting so text (if displayed) is cleared
   keyboard.display();
 
-  // info panel
+  // lower-left info box
   fill(255);
-  rect(3.5*height/5, 5*height/6, 2*height/5, height/8);
-  fill(0);
-  textFont(f, (width+height)/40);
-  text("Best-guess key signature: " + keySig, height/16, 2*height/6 - height/75);
   textFont(f, (width+height)/85);
+  rect(height/24, 19*height/24, 9*height/24, 4*height/24 + 5); // box
+  fill(0);
   if (!post) { 
-    text("Notes stored: "+notesStored, 4*height/5, 4*height/6 + height/7 + height/18);
+    text("Notes stored: "+notesStored, 2*height/24, 20*height/24);
+  } else {
+    text("Total notes: " + (histIn.split("-").length + histOut.split("-").length - 2), 2*height/24, 20*height/24);
   }
-  text(" human", 4*height/5 + 20, 4*height/6 + height/7 + height/18 + height/75 + 15);
-  text(" system", 4*height/5 + 20, 4*height/6 + height/7 + height/18 + 4*height/75 + 15);
-  fill(178, 206, 252); // fill RGB values
-  rect(4*height/5, 4*height/6 + height/7 + height/18 + height/75, 15, 15);
-  fill(255, 206, 162); // fill RGB values
-  rect(4*height/5, 4*height/6 + height/7 + height/18 + 4*height/75, 15, 15);
+  text(" human", 3*height/24, 21*height/24);
+  text(" system", 3*height/24, 22*height/24);
+  if (!splitKey) {
+    text(" both", 3*height/24, 23*height/24);
+    fill(255, 41, 41); // red
+    rect(2*height/24, 22.5*height/24, .5*height/24, .5*height/24);
+  }
+  fill(245, 159, 0); // orange
+  rect(2*height/24, 20.5*height/24, .5*height/24, .5*height/24);
+  fill(41, 77, 255); // fill RGB values
+  rect(2*height/24, 21.5*height/24, .5*height/24, .5*height/24);
 
-  // indicator message (to be made prettier)
+  fill(0);
+  if (graphVis) {
+    textFont(f, (width+height)/60);
+    text("I think you're playing in " + keySig, width/2, 15*height/20);
+  } else {
+    textFont(f, (width+height)/50);
+    text("I think you're playing in " + keySig, height/16, 2*height/6 - height/75);
+  }
+  textFont(f, (width+height)/85);
+
+  // post-analysis indicator
+  if (post) {
+    fill(255, 189, 189);
+    rect(height/20, 1.2*height/20, 4*height/20, height/20);
+    fill(0);
+    text("Post-Analysis", 1.1*height/20, 2.25*height/24);
+  }
+
+  // mode indicator message
   fill(0);
   if (midiRec) {
     text("Mode: MIDI", height/20, height/20);
@@ -118,10 +172,11 @@ void draw() {
         notesStored = 10 + Math.round(20*(queue.getAvg())); // updating notes stored
       }
 
-      queue.queueDisplay();
+      //queue.queueDisplay();
       prevTime = millis();
     }
 
+    // get amount of notes to take, take maximum if post (overflows handled), notesStored otherwise
     int currentNoteTake = 0;
     if (post) {
       currentNoteTake = Math.max(histIn.split("-").length, histOut.split("-").length);
@@ -129,6 +184,7 @@ void draw() {
       currentNoteTake = notesStored;
     }
 
+    // update keyboard heatmap
     keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, currentNoteTake));
     keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, currentNoteTake));
   }
@@ -158,6 +214,13 @@ void keyPressed() {
     break;
   case 'c': // clear session
     clearProgram();
+    break;
+  case 'g': // toggle visualization mode
+    graphVis = !graphVis;
+    break;
+  case 'v': // change graph
+    vis++;
+    break;
   }
 }
 
@@ -170,7 +233,8 @@ void clearProgram() {
   histOut = "";
   notesStored = 40;
   lastNotes = 0;
-  keySig = "None";
+  keySig = "—";
+  vis = 1;
   keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, histIn.split("-").length));
   keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, histOut.split("-").length));
 }
@@ -228,6 +292,14 @@ void updateKeySig(int[] notesFreq) {
   }
 
   keySig = noteToText[maxNote]; // updating text
+  
+  // checking frequency of third to guess major/minor
+  if (octaveFreq[(maxNote+3)%12] > octaveFreq[(maxNote+4)%12]) {
+    // if third is normally flat
+    keySig += " Minor";
+  } else {
+    keySig += " Major";
+  }
 }
 
 /**

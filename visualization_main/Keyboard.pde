@@ -64,19 +64,108 @@ class Keyboard {
       keyArray[pKey].drawKey(); // drawing black keys over
     }
 
-    if (numbersOn) {
-      displayLabels(); // displaying labels if desired
+    if (numbersOn && !graphVis) {
+      displayLabels(); // displaying freq labels if desired
     }
-    
-    // showing moving average
-    stroke(0, 0, 205);
-    strokeWeight(15);
-    float p_len = PIANO_WIDTH/89; // normalize to scale
-    point((width-PIANO_WIDTH)/2 + (inAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
-    stroke(255, 140, 0);
-    point((width-PIANO_WIDTH)/2 + (outAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
-    strokeWeight(1);
-    stroke(0);
+
+    if (graphVis) {
+      // display graphics
+      displayGraphic();
+    } else {
+      // showing moving average
+      stroke(0, 0, 205);
+      strokeWeight(15);
+      float p_len = PIANO_WIDTH/89; // normalize to scale
+      point((width-PIANO_WIDTH)/2 + (inAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
+      stroke(255, 140, 0);
+      point((width-PIANO_WIDTH)/2 + (outAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
+      strokeWeight(1);
+      stroke(0);
+    }
+  }
+
+  void displayGraphic() {
+    // handles graph vis.
+    int totalVis = 3;
+    GPointsArray points = new GPointsArray(88); // maybe don't need to redefine these
+    GPointsArray pointsOut = new GPointsArray(88);
+
+    // user input
+    float maxPoint = 0.0;
+    // updating graph
+    for (int i=0; i < 88; i++) {
+      float thisInFreq = keyArray[i].getInProb();
+      float thisOutFreq = keyArray[i].getOutProb();
+      
+      points.add(i, thisInFreq); // add each key
+      pointsOut.add(i, thisOutFreq);
+      // adjust for max Y axis
+      if (thisInFreq > maxPoint) {
+        maxPoint = thisInFreq;
+      } else if (thisOutFreq > maxPoint) {
+        maxPoint = thisOutFreq;
+      }
+    }
+
+    // show correct graph
+    switch (vis % totalVis) {
+    case 0: // double line
+      plot.setPoints(points);
+      plot.removeLayer("layer 1");
+      plot.addLayer("layer 1", pointsOut);
+      plot.getLayer("layer 1").setLineColor(color(255, 206, 162)); // orange = system
+
+      // Draw the plot
+      plot.beginDraw();
+      plot.setYLim(0, maxPoint); // set Y-axis max to max point
+      //plot.drawBackground();
+      plot.drawYAxis();
+      //plot.drawXAxis(); // for testing
+      //plot.drawGridLines(GPlot.BOTH);
+      //plot.drawLines();
+      plot.drawFilledContours(GPlot.HORIZONTAL, 0);
+      //plot.getLayer("layer 1").drawFilledContour(GPlot.HORIZONTAL, 0);
+      plot.endDraw();
+      break;
+
+    case 1:
+      plot.setPoints(points);
+      plot.setLineColor(color(178, 206, 252));
+      plot.removeLayer("layer 1");
+      plot.addLayer("layer 1", pointsOut);
+      plot.getLayer("layer 1").setLineWidth(3.0);
+      plot.getLayer("layer 1").setLineColor(color(255, 206, 162)); // orange = system
+
+      // Draw the plot
+      plot.beginDraw();
+      plot.setYLim(0, maxPoint); // set Y-axis max to max point
+      plot.drawYAxis();
+      plot.setLineWidth(3.0);
+      plot.drawLines();
+      plot.endDraw();
+      break;
+
+    case 2:
+      plot.setPoints(points);
+      plot1.setPoints(pointsOut);
+
+      // Draw the plots
+      plot.beginDraw();
+      plot.setYLim(0, maxPoint); // set Y-axis max to max point
+      plot.drawYAxis();
+      plot.drawHistograms();
+      plot.endDraw();
+
+      plot1.beginDraw();
+      plot1.getHistogram().setBgColors(new color[] {color(255, 206, 162) });
+      plot1.setYLim(0, maxPoint);
+      plot1.drawYAxis();
+      //plot1.getHistogram().setDrawLabels(true);
+      plot1.drawHistograms();
+      plot1.endDraw();
+
+      break;
+    }
   }
 
   void toggleNumbers() {
@@ -140,13 +229,13 @@ class Keyboard {
     textFont(f, .9*((width+height)/100));
     for (int i=0; i<blackKeys.length; i++) {
       PianoKey pKey = keyArray[blackKeys[i]];
-      
+
       pushMatrix();
-      
+
       if (i == 1 || (i-1)%5 == 0 || (i-1)%5 == 2) {
         offset += whiteWidth; // ensure correct position of 3rd black key
       }
-      
+
       translate(offset + (whiteWidth - blackWidth/2) + blackWidth/12, PIANO_HEIGHT + 1.5*whiteHeight);
       rotate(PI/2);
       text(pKey.getTotalProb(), 0, 0);

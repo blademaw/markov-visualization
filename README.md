@@ -21,6 +21,8 @@ A project about visualizing the inner workings and output of the AI-based music 
 	* `s` — toggles split keys in favor of overlap color
 	* `p` — toggles post analysis for viewing entire performance statistics
 	* `m` — changes mode of operation (see below)
+	* `g` — changes between keyboard/graph view
+	* `v` — cycles through graph visuals (line/histogram/contour)
 	* mouse click — toggles empirical probabilities of keys (normalized frequency)
 ### Modes of Operation
 
