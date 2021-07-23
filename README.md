@@ -44,9 +44,10 @@ Not preferred. Receive key presses & system output via OSC messages clocked by t
 
 Preferred. Receive key presses & system output via MIDI input from user and system. No lag & instantaneous visualisation.
 
-### Debugging
+### Debugging/developer tools
 
 * In case of failure program can be run in debugging mode by setting `debugMode` to `true` in `visualization_main.pde`
+* The background brightness can be increased/decreased with keys `i` and `d` respectively
 * As a failsafe, visualisation can be altered with specific key presses. These are:
 	* `c` — resets & clears visualisation's memory
 	* `s` — toggles split keys
@@ -59,6 +60,7 @@ Preferred. Receive key presses & system output via MIDI input from user and syst
 ### Additional information
 
 * Built entirely under Processing 3.5.4
+* Grafica's plot width and dimensions do not appear to scale at a fixed rate; so if the graph is misaligned with the keyboard, the x value for `plot.setPos()` should be adjusted, and possibly the plot's width in `plot.setDim()`
 
 ## Acknowledgements
 

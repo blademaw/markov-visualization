@@ -1,5 +1,20 @@
+/*
+
+ Created by:
+ Jack
+ On Date:
+ 5-Jul-2021
+ Last updated on:
+ 23-Jul-2021
+ Purpose & intent:
+ * act as class for individual piano key
+ */
+
 import java.util.Arrays;
 
+/**
+ * Class for a queue data structure
+ */
 class Queue { 
   private int front, rear, capacity; 
   private int queue[]; 
@@ -10,7 +25,9 @@ class Queue {
     queue = new int[capacity];
   } 
 
-  // insert an element into the queue
+  /**
+   * Function to insert an element into the queue
+   */
   void queueEnqueue(int item) { 
     // check if the queue is full
     if (capacity == rear) { 
@@ -27,7 +44,9 @@ class Queue {
     return;
   } 
 
-  //remove an element from the queue
+  /**
+   * Function to remove an element from the queue
+   */
   void queueDequeue() { 
     // check if queue is empty 
     if (front == rear) { 
@@ -51,32 +70,27 @@ class Queue {
     } 
     return;
   }
-  
-  // clear the queue
+
+  /**
+   * Function to clear the queue
+   */
   void clear() {
     while (this.rear > 0) {
       this.queueDequeue();
     }
   }
 
-  // print queue elements 
+  /**
+   * Function to print the queue
+   */
   void queueDisplay() 
   { 
     println(Arrays.toString(queue));
-  } 
+  }
 
-  // print front of queue 
-  void queueFront() 
-  { 
-    if (front == rear) { 
-      System.out.printf("Queue is Empty\n"); 
-      return;
-    } 
-    System.out.printf("\nFront Element of the queue: %d", queue[front]); 
-    return;
-  } 
-
-  // get average of queue
+  /**
+   * Function to get the average of the queue
+   */
   float getAvg() {
     float res = 0;
     for (int notesAmt : queue) {
@@ -85,11 +99,16 @@ class Queue {
     return res/(rear);
   }
 
-  // get array of queue
+  /**
+   * Function to return the array of the queue
+   */
   int[] getArray() {
     return Arrays.copyOf(queue, queue.length);
   }
-  
+
+  /**
+   * Function to get the length of the queue
+   */
   int getLength() {
     return rear;
   }

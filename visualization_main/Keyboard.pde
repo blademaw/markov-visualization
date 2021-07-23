@@ -4,6 +4,8 @@
  Jack
  On Date:
  5-Jul-2021
+ Last updated on:
+ 23-Jul-2021
  Purpose & intent:
  * act as class for full-size keyboard
  */
@@ -14,8 +16,8 @@
  */
 class Keyboard {
   // setting constants
-  float PIANO_WIDTH = width-(height/8); // 
-  float PIANO_HEIGHT = 2*height/6; // 2/6 down the page
+  float PIANO_WIDTH = width-(height/8);
+  float PIANO_HEIGHT = 2*height/6;
   boolean numbersOn = false;
 
   // deriving widths
@@ -32,8 +34,10 @@ class Keyboard {
   Keyboard() {
   }
 
+  /**
+   * Function to add keys to piano
+   */
   void addKeys() {
-    // function to add keys to piano
     // initializing white keys
     float offset = 0.0;
     for (int keyId : whiteKeys) {
@@ -48,12 +52,16 @@ class Keyboard {
       if (keyId == 4 || (keyId-3)%12 == 6 || (keyId-3)%12 == 1) {
         offset += whiteWidth; // extra spaces between black keys
       }
+      // position key in the middle of this white key and the next one
       PianoKey newKey = new PianoKey(keyId, (2*whiteWidth - blackWidth)/2 + offset, PIANO_HEIGHT, blackWidth, blackHeight);
       keyArray[keyId] = newKey; // add key to key array
       offset += whiteWidth;
     }
   }
 
+  /**
+   * Displays piano keys on screen
+   */
   void display() {    
     // displays keys, handling overlap order
     for (int pKey : whiteKeys) {
@@ -69,27 +77,29 @@ class Keyboard {
     }
 
     if (graphVis) {
-      // display graphics
+      // display graph visualisations
       displayGraphic();
     } else {
       if (disMovAvg) {
-      // showing moving average
-      stroke(0, 0, 205);
-      strokeWeight(15);
-      float p_len = PIANO_WIDTH/89; // normalize to scale
-      point((width-PIANO_WIDTH)/2 + (inAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
-      stroke(255, 140, 0);
-      point((width-PIANO_WIDTH)/2 + (outAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
-      strokeWeight(1);
-      stroke(0);
+        // showing moving average
+        stroke(0, 0, 205);
+        strokeWeight(15);
+        float p_len = PIANO_WIDTH/89; // normalize to scale
+        point((width-PIANO_WIDTH)/2 + (inAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
+        stroke(255, 140, 0);
+        point((width-PIANO_WIDTH)/2 + (outAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
+        strokeWeight(1);
+        stroke(0);
       }
     }
   }
 
+  /**
+   * Function to display line/histogram visualisations
+   */
   void displayGraphic() {
-    // handles graph vis.
     int totalVis = 3;
-    GPointsArray points = new GPointsArray(88); // maybe don't need to redefine these
+    GPointsArray points = new GPointsArray(88);
     GPointsArray pointsOut = new GPointsArray(88);
 
     // user input
@@ -109,7 +119,7 @@ class Keyboard {
       }
     }
 
-    // show correct graph
+    // show selected graph
     switch (vis % totalVis) {
     case 0: // double line
       plot.setPoints(points);
@@ -120,13 +130,8 @@ class Keyboard {
       // Draw the plot
       plot.beginDraw();
       plot.setYLim(0, maxPoint); // set Y-axis max to max point
-      //plot.drawBackground();
       plot.drawYAxis();
-      //plot.drawXAxis(); // for testing
-      //plot.drawGridLines(GPlot.BOTH);
-      //plot.drawLines();
       plot.drawFilledContours(GPlot.HORIZONTAL, 0);
-      //plot.getLayer("layer 1").drawFilledContour(GPlot.HORIZONTAL, 0);
       plot.endDraw();
       break;
 
@@ -170,6 +175,9 @@ class Keyboard {
     }
   }
 
+  /**
+   * Function to toggle normalised frequency labels
+   */
   void toggleNumbers(boolean status) {
     if (status) {
       numbersOn = true;
@@ -178,8 +186,10 @@ class Keyboard {
     }
   }
 
+  /**
+   * Function to update input probabilities/normalised frequencies of keys based on frequency array
+   */
   void updateInFreqs(int[] freq) {
-    // updates user frequencies for keys across keyboard given most recent OSC message
     assert freq.length == keyArray.length;
     inAvg = 0.0;
 
@@ -195,8 +205,10 @@ class Keyboard {
     }
   }
 
+  /**
+   * Function to update output probabilities/normalised frequencies of keys based on frequency array
+   */
   void updateOutFreqs(int[] freq) {
-    // updates system frequencies for keys across keyboard given most recent OSC message
     assert freq.length == keyArray.length;
     outAvg = 0.0;
 
@@ -212,13 +224,13 @@ class Keyboard {
     }
   }
 
+  /**
+   * Function to display rotated normalised frequency labels if desired
+   */
   void displayLabels() {
-    // function to display labels beneath white keys, above black
-
     // white keys
     textFont(f, (width+height)/100);
     fill(0);
-
 
     float offset = (width-PIANO_WIDTH)/2; // start where piano starts
     for (int pKey : whiteKeys) {

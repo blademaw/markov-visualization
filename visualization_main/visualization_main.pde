@@ -35,14 +35,13 @@ GPlot plot, plot1; // two plots (hist, line)
 GPointsArray points, pointsOut;
 
 void setup() {
-  size(1000, 600);
+  fullScreen();
+  //size(2560, 1440); // this should be Processing's judgement of a 5120x2880 screen due to 2x pixel density
+  //pixelDensity(displayDensity()); // uncomment this for sharper graphics but (possibly) slower performance
   strokeWeight(1);
   f = createFont("Arial", 16, true);
 
   debugMode = false; // change this to run program in debug mode
-
-  // control P5 GUI
-  cp5 = new ControlP5(this);
 
   // initialize virtual piano
   keyboard = new Keyboard();
@@ -58,19 +57,7 @@ void setup() {
   oscRec.plug(this, "outputReceive", "/OutputMemory");
 
   if (debugMode) {
-    println("Available MIDI Devices:"); 
-
-    System.out.println("----------Input (from availableInputs())----------");
-    String[] available_inputs = MidiBus.availableInputs(); //Returns an array of available input devices
-    for (int i = 0; i < available_inputs.length; i++) System.out.println("["+i+"] \""+available_inputs[i]+"\"");
-
-    System.out.println("----------Output (from availableOutputs())----------");
-    String[] available_outputs = MidiBus.availableOutputs(); //Returns an array of available output devices
-    for (int i = 0; i < available_outputs.length; i++) System.out.println("["+i+"] \""+available_outputs[i]+"\"");
-
-    System.out.println("----------Unavailable (from unavailableDevices())----------");
-    String[] unavailable = MidiBus.unavailableDevices(); //Returns an array of unavailable devices
-    for (int i = 0; i < unavailable.length; i++) System.out.println("["+i+"] \""+unavailable[i]+"\"");
+    displayAvailableMidiDevices();
   }
 
   // setting up MidiBus & midi values
@@ -85,26 +72,11 @@ void setup() {
   pointsOut = new GPointsArray(nPoints);
   plot = new GPlot(this);
 
-  // dimensions
-  float graphX = -width*.12;
+  float graphX = -width*0.084; // if the line chart is not aligned properly, this is the culprit
   float graphYMax = height/20;
-  float graphWidth = width*1.1;
+  float graphWidth = width*1.108;
   float graphHeight = 8*height/20;
-
-  plot.setPos(graphX, graphYMax); // top-left corner
-  plot.setYLim(0, 1); // max 1 normalized frequency
-  plot.setDim(graphWidth, graphHeight);
-  plot.setLineColor(color(178, 206, 252));
-  plot.addLayer("layer 1", pointsOut);
-  plot.startHistograms(GPlot.VERTICAL);
-
-  // second line for system input
-  plot1 = new GPlot(this);
-  plot1.setPos(graphX, graphYMax);
-  plot1.setYLim(0, 1);
-  plot1.setDim(graphWidth, graphHeight);
-  plot1.setLineColor(color(255, 206, 162));
-  plot1.startHistograms(GPlot.VERTICAL);
+  initPlots(graphX, graphYMax, graphWidth, graphHeight);
 
   // setting initial global variables
   post = false; // toggle post analysis
@@ -123,8 +95,55 @@ void setup() {
   disKeySig = false; // don't display key signature by default
   disMovAvg = false; // don't display moving averages by default
 
-  // GUI options
-  recModeButton = cp5.addRadioButton("radioButton")
+  // control P5 GUI
+  cp5 = new ControlP5(this);
+  drawGuiOptions();
+}
+
+/**
+ * Function to display MIDI devices for debugging
+ */
+void displayAvailableMidiDevices() {
+  println("Available MIDI Devices:"); 
+
+  System.out.println("----------Input (from availableInputs())----------");
+  String[] available_inputs = MidiBus.availableInputs(); //Returns an array of available input devices
+  for (int i = 0; i < available_inputs.length; i++) System.out.println("["+i+"] \""+available_inputs[i]+"\"");
+
+  System.out.println("----------Output (from availableOutputs())----------");
+  String[] available_outputs = MidiBus.availableOutputs(); //Returns an array of available output devices
+  for (int i = 0; i < available_outputs.length; i++) System.out.println("["+i+"] \""+available_outputs[i]+"\"");
+
+  System.out.println("----------Unavailable (from unavailableDevices())----------");
+  String[] unavailable = MidiBus.unavailableDevices(); //Returns an array of unavailable devices
+  for (int i = 0; i < unavailable.length; i++) System.out.println("["+i+"] \""+unavailable[i]+"\"");
+}
+
+/**
+ * Function to initialize Grafica plots
+ */
+void initPlots(float graphX, float graphYMax, float graphWidth, float graphHeight) {
+  plot.setPos(graphX, graphYMax); // top-left corner
+  plot.setYLim(0, 1); // max 1 normalized frequency
+  plot.setDim(graphWidth, graphHeight);
+  plot.setLineColor(color(178, 206, 252));
+  plot.addLayer("layer 1", pointsOut);
+  plot.startHistograms(GPlot.VERTICAL);
+
+  // second line for system input
+  plot1 = new GPlot(this);
+  plot1.setPos(graphX, graphYMax);
+  plot1.setYLim(0, 1);
+  plot1.setDim(graphWidth, graphHeight);
+  plot1.setLineColor(color(255, 206, 162));
+  plot1.startHistograms(GPlot.VERTICAL);
+}
+
+/**
+ * Function to intialize the GUI elements of the option box
+ */
+void drawGuiOptions() {
+  recModeButton = cp5.addRadioButton("radioButton") // Graph/keyboard
     .setPosition(6.25*width/24, 20.5*height/24)
     .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
     .setColorForeground(150)
@@ -144,7 +163,7 @@ void setup() {
   }
   recModeButton.activate(1);
 
-  visButton = cp5.addRadioButton("radioButton2")
+  visButton = cp5.addRadioButton("radioButton2") // choosing graph viz.
     .setPosition(8.25*width/24, 20.5*height/24)
     .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
     .setColorForeground(150)
@@ -152,9 +171,9 @@ void setup() {
     .setColorLabel(155)
     .setItemsPerRow(1)
     .setSpacingColumn(5)
-    .addItem("1", 0)
-    .addItem("2", 1)
-    .addItem("3", 2);
+    .addItem("Line Filled", 0)
+    .addItem("Line Stroke", 1)
+    .addItem("Histogram", 2);
   visButton.activate(1);
 
   for (Toggle t : visButton.getItems()) {
@@ -165,7 +184,7 @@ void setup() {
     t.getCaptionLabel().getStyle().backgroundHeight = 13;
   }
 
-  midiModeBox = cp5.addCheckBox("checkBox")
+  midiModeBox = cp5.addCheckBox("checkBox") // MIDI/OSC toggle
     .setPosition(6.25*width/24, 22.25*height/24)
     .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
     .setItemsPerRow(1)
@@ -174,7 +193,7 @@ void setup() {
     .addItem("MIDI", 1)
     ;
 
-  optionsBox = cp5.addCheckBox("checkBox2")
+  optionsBox = cp5.addCheckBox("checkBox2") // other options
     .setPosition(11.25*width/24, 20.5*height/24)
     .setSize((int) (0.5*width)/24, (int) (.75*height)/24)
     .setItemsPerRow(3)
@@ -193,9 +212,10 @@ void setup() {
 
 void draw() {
   background(bgCol); // resetting so text (if displayed) is cleared
-  keyboard.display();
+  keyboard.display(); // displaying keyboard
+  drawLegend(); // drawing legend
 
-  drawLegend();
+  // hiding GUI if no options box
   if (opDisplay) {
     drawOptionBox();
     recModeButton.show();
@@ -209,14 +229,8 @@ void draw() {
     optionsBox.hide();
   }
 
-
-  fill(0);
-  if (graphVis && disKeySig) {
-    textFont(f, (width+height)/60);
-    text("I think you're playing in " + keySig, width/2, 15*height/20);
-  } else if (!graphVis && disKeySig) {
-    textFont(f, (width+height)/50);
-    text("I think you're playing in " + keySig, height/16, 2*height/6 - height/75);
+  if (disKeySig) {
+    drawKeySignature();
   }
   textFont(f, (width+height)/85);
 
@@ -226,7 +240,6 @@ void draw() {
     rect(height/20, 1.2*height/20, 4*height/20, height/20);
     fill(0);
     text("Post-Analysis", 1.1*height/20, 2.25*height/24);
-
     fill(255);
   }
 
@@ -243,40 +256,60 @@ void draw() {
     println("out: " + histOut);
   }
 
-  // midi loop
+  // midi loop - only triggers if 
   if (midiRec) {
-    // handle logic for updating notesStored, clocks every second
-    if (millis() > prevTime + intervalTime)
-    {
-      // adding notesStored to queue
-      if (secNotes == 0 && queue.getLength() == 0) {
-        // hasn't started playing yet, don't add
-      } else {
-        queue.queueEnqueue(secNotes);
-      }
-      secNotes = 0; // resetting notes this second
+    midiNotesStored();
+  }
+}
 
-      // update notesStored with sufficient input
-      if (queue.getLength() == 30) {
-        //println("This is getting triggered");
-        notesStored = 10 + Math.round(20*(queue.getAvg())); // updating notes stored
-      }
+/**
+ * Updates notes stored with MIDI input
+ */
+void midiNotesStored() {
+  // handle logic for updating notesStored, clocks every second
+  if (millis() > prevTime + intervalTime)
+  {
+    // adding new notes per second to queue
+    if (secNotes == 0 && queue.getLength() == 0) {
+      // hasn't started playing yet, don't add
+    } else {
+      queue.queueEnqueue(secNotes);
+    }
+    secNotes = 0; // resetting notes this second for next second
 
-      //queue.queueDisplay();
-      prevTime = millis();
+    // updating notesStored if there is sufficient input
+    if (queue.getLength() == 30) {
+      notesStored = 10 + Math.round(20*(queue.getAvg())); // updating notes stored
     }
 
-    // get amount of notes to take, take maximum if post (overflows handled), notesStored otherwise
-    int currentNoteTake = 0;
-    if (post) {
-      currentNoteTake = Math.max(histIn.split("-").length, histOut.split("-").length);
-    } else { 
-      currentNoteTake = notesStored;
-    }
+    prevTime = millis();
+  }
 
-    // update keyboard heatmap
-    keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, currentNoteTake));
-    keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, currentNoteTake));
+  // get amount of notes to take, take maximum if post-analysis active (overflows handled)
+  int currentNoteTake = 0;
+  if (post) {
+    currentNoteTake = Math.max(histIn.split("-").length, histOut.split("-").length);
+  } else { 
+    currentNoteTake = notesStored;
+  }
+
+  // update keyboard heatmap
+  keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, currentNoteTake));
+  keyboard.updateOutFreqs(getFrequenciesFromMidiString(histOut, currentNoteTake));
+}
+
+/**
+ * Draws key signature text
+ * :precondition: disKeySig is true
+ */
+void drawKeySignature() {
+  fill(0);
+  if (graphVis) {
+    textFont(f, (width+height)/60);
+    text("I think you're playing in " + keySig, width/2, 15*height/20);
+  } else if (!graphVis) {
+    textFont(f, (width+height)/50);
+    text("I think you're playing in " + keySig, height/16, 2*height/6 - height/75);
   }
 }
 
@@ -284,7 +317,6 @@ void draw() {
  * Draws legend
  */
 void drawLegend() {
-  // lower-left legend
   fill(255);
   textFont(f, (width+height)/85);
   rect(width/24, 19*height/24, 5*width/24, 4*height/24 + 5); // box
@@ -308,7 +340,7 @@ void drawLegend() {
 }
 
 /**
- * Draws options box if necessary
+ * Draws options box (if toggled)
  */
 void drawOptionBox() {
   fill(bgCol-10);
@@ -375,7 +407,7 @@ void controlEvent(ControlEvent theEvent) {
 }
 
 /**
- * Controls for visualisation
+ * Hidden controls for visualisation
  */
 void keyPressed() {
   switch (key) {
@@ -411,7 +443,7 @@ void keyPressed() {
 }
 
 /**
- * Function to clear all of program's memory
+ * Function to clear memory of visualisation
  */
 void clearProgram() {
   queue.clear();
@@ -427,6 +459,7 @@ void clearProgram() {
 
 /**
  * Updates amount of notes taken as sample in visualisation to display heatmap
+ * Only used for OSC mode
  */
 void updateNotesStored(String[] noteVals) {
   // adjusting notes stored (only if we have at least 30 seconds of data)
@@ -443,16 +476,18 @@ void updateNotesStored(String[] noteVals) {
 
   if (debugMode) {
     println("New notes: " + newNotes + ". Queue:");
-    queue.queueDisplay(); // debugging
+    queue.queueDisplay();
   }
-  lastArray = noteVals;
+
+  lastArray = noteVals; // save the last array for future comparison
   if (queue.getLength() >= 30) { // if we have sufficient input
     notesStored = 10 + Math.round(20*(queue.getAvg())); // updating notes stored
   }
 }
 
 /**
- * to update key signature (right now just takes most frequent note)
+ * To update key signature
+ * Takes most frequent note and more popular minor/major third
  */
 void updateKeySig(int[] notesFreq) {
   int[] octaveFreq = new int[12];
@@ -461,8 +496,8 @@ void updateKeySig(int[] notesFreq) {
     octaveFreq[i] = 0;
     for (int j=0; j<7; j++) {
       // for each octave
-      int noteInd = (3 + i) + j*12; // (offset to C1 + note) + octave offset
-      octaveFreq[i] += notesFreq[noteInd]; // increment by note, octave
+      int noteInd = (3 + i) + j*12; // (offset to C1 + this note) + octave
+      octaveFreq[i] += notesFreq[noteInd]; // increment by freq[note on octave]
     }
   }
   // manually incrementing keys not in the loop
@@ -492,6 +527,7 @@ void updateKeySig(int[] notesFreq) {
 
 /**
  * Function to get the array of frequencies of midi notes from a string formatted correctly
+ * Used for OSC & MIDI
  */
 int[] getFrequenciesFromMidiString(String midi, int notesTake) {
   int[] notesFreq = new int[88];
@@ -504,16 +540,22 @@ int[] getFrequenciesFromMidiString(String midi, int notesTake) {
     return notesFreq;
   }
 
+  // processing OSC message
   String[] noteArray = midi.replaceAll("(0,)*", "").replaceAll(",", "").split("-"); // get array of just notes
   String[] noteVals = Arrays.copyOfRange(noteArray, Math.max(0, noteArray.length-notesTake), noteArray.length); // take last <notesStored> notes
 
   // increment in frequency array, adjusting for MIDI values
   for (String note : noteVals) {
-    notesFreq[Integer.parseInt(note)-21]++;
+    if (Integer.parseInt(note)-21 >= 88) {
+      if (debugMode) {
+        println("Encountered note out of octave bounds.");
+      }
+    } else {
+      notesFreq[Integer.parseInt(note)-21]++;
+    }
   }
 
-  // with array of notes of length notesStored, try to figure out key signature
-  updateKeySig(notesFreq); // also called during output
+  updateKeySig(notesFreq); // update key signature
 
   return notesFreq;
 }
@@ -570,12 +612,11 @@ void inputReceive(String inMemory) {
     return;
   }
 
-  if (!Arrays.equals(noteVals, lastArray)) {
+  if (!Arrays.equals(noteVals, lastArray)) { // if we have new input
     histIn += noteVals[ARR_SIZE-1]; // append current notes to history (only do this if update)
   }
 
-  updateNotesStored(noteVals);
-
+  updateNotesStored(noteVals); // update notes stored
 
   if (post) {
     keyboard.updateInFreqs(getFrequenciesFromMidiString(histIn, histIn.split("-").length));
@@ -586,7 +627,6 @@ void inputReceive(String inMemory) {
 
 /**
  * Receives and handles input from system input OSC message '/OutputMemory'
- * <p>
  * Output string must be in the format: string of leading 0s + integer midi values separated by '-'
  */
 void outputReceive(String outMemory) {
