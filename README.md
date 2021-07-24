@@ -60,6 +60,9 @@ Preferred. Receive key presses & system output via MIDI input from user and syst
 ### Additional information
 
 * Built entirely under Processing 3.5.4
+* MIDI controller changes are active on the following addresses:
+	* 123 — resets the system
+	* 32 — cycles the visualisation preset in graph mode
 * Grafica's plot width and dimensions do not appear to scale at a fixed rate; so if the graph is misaligned with the keyboard, the x value for `plot.setPos()` should be adjusted, and possibly the plot's width in `plot.setDim()`
 
 ## Acknowledgements
