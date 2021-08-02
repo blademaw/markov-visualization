@@ -4,7 +4,7 @@
  On date:
  14-Jul-2021
  Last updated on:
- 23-Jul-2021
+ 02-Aug-2021
  Purpose:
  experiment further with Markov system visualisations
  */
@@ -35,7 +35,8 @@ GPlot plot, plot1; // two plots (hist, line)
 GPointsArray points, pointsOut;
 
 void setup() {
-  fullScreen();
+  //fullScreen();
+  size(1120, 630);
   //size(2560, 1440); // this should be Processing's judgement of a 5120x2880 screen due to 2x pixel density
   //pixelDensity(displayDensity()); // uncomment this for sharper graphics but (possibly) slower performance
   strokeWeight(1);
@@ -67,14 +68,14 @@ void setup() {
   secNotes = 0; // number of notes recieved in past second
 
   // setting up graph visualisations
-  int nPoints = 88; // 88 keys
+  int nPoints = 61; // 61 keys
   points = new GPointsArray(nPoints);
   pointsOut = new GPointsArray(nPoints);
   plot = new GPlot(this);
 
-  float graphX = -width*0.084; // if the line chart is not aligned properly, this is the culprit
+  float graphX = -width*0.078; // if the line chart is not aligned properly, this is the culprit
   float graphYMax = height/20;
-  float graphWidth = width*1.108;
+  float graphWidth = width*1.108; // if the line is too big for the keyboard, change this
   float graphHeight = 8*height/20;
   initPlots(graphX, graphYMax, graphWidth, graphHeight);
 
@@ -319,7 +320,7 @@ void drawKeySignature() {
 void drawLegend() {
   fill(255);
   textFont(f, (width+height)/85);
-  rect(width/24, 19*height/24, 5*width/24, 4*height/24 + 5); // box
+  rect(width/24, 19*height/24, 5*width/24, 4.5*height/24); // box
   fill(0);
   if (!post) { 
     text("Notes stored: "+notesStored, 1.5*width/24, 20*height/24);
@@ -546,9 +547,9 @@ int[] getFrequenciesFromMidiString(String midi, int notesTake) {
 
   // increment in frequency array, adjusting for MIDI values
   for (String note : noteVals) {
-    if (Integer.parseInt(note)-21 >= 88) {
+    if (Integer.parseInt(note) > 96 || Integer.parseInt(note) < 36) {
       if (debugMode) {
-        println("Encountered note out of octave bounds.");
+        println("Encountered note out of current bounds.");
       }
     } else {
       notesFreq[Integer.parseInt(note)-21]++;

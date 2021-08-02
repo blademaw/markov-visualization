@@ -5,7 +5,7 @@
  On Date:
  5-Jul-2021
  Last updated on:
- 23-Jul-2021
+ 02-Aug-2021
  Purpose & intent:
  * act as class for full-size keyboard
  */
@@ -21,15 +21,15 @@ class Keyboard {
   boolean numbersOn = false;
 
   // deriving widths
-  float whiteWidth = PIANO_WIDTH/52; // 52 white keys
+  float whiteWidth = PIANO_WIDTH/36; // 36 available white keys
   float whiteHeight = 2*height/8; // 2/8 of screen Y
   float blackWidth = 2*whiteWidth/3; // 2/3 of white key X
   float blackHeight = 2*whiteHeight/3; // 2/3 of white key Y
 
-  // 88 keys; midi numbers range from 21–108
+  // 61 keys; midi numbers range from 36–96
   PianoKey[] keyArray = new PianoKey[88];
-  int[] whiteKeys = {0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24, 26, 27, 29, 31, 32, 34, 36, 38, 39, 41, 43, 44, 46, 48, 50, 51, 53, 55, 56, 58, 60, 62, 63, 65, 67, 68, 70, 72, 74, 75, 77, 79, 80, 82, 84, 86, 87};
-  int[] blackKeys = {1, 4, 6, 9, 11, 13, 16, 18, 21, 23, 25, 28, 30, 33, 35, 37, 40, 42, 45, 47, 49, 52, 54, 57, 59, 61, 64, 66, 69, 71, 73, 76, 78, 81, 83, 85};
+  int[] whiteKeys = {15, 17, 19, 20, 22, 24, 26, 27, 29, 31, 32, 34, 36, 38, 39, 41, 43, 44, 46, 48, 50, 51, 53, 55, 56, 58, 60, 62, 63, 65, 67, 68, 70, 72, 74, 75};
+  int[] blackKeys = {16, 18, 21, 23, 25, 28, 30, 33, 35, 37, 40, 42, 45, 47, 49, 52, 54, 57, 59, 61, 64, 66, 69, 71, 73};
 
   Keyboard() {
   }
@@ -49,7 +49,7 @@ class Keyboard {
     // initializing black keys
     offset = (width-PIANO_WIDTH)/2; // begin at first white key
     for (int keyId : blackKeys) {
-      if (keyId == 4 || (keyId-3)%12 == 6 || (keyId-3)%12 == 1) {
+      if ((keyId-15)%12  == 6 || (keyId-15)%12 == 1 && keyId != 16) {
         offset += whiteWidth; // extra spaces between black keys
       }
       // position key in the middle of this white key and the next one
@@ -84,10 +84,10 @@ class Keyboard {
         // showing moving average
         stroke(0, 0, 205);
         strokeWeight(15);
-        float p_len = PIANO_WIDTH/89; // normalize to scale
-        point((width-PIANO_WIDTH)/2 + (inAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
+        float p_len = PIANO_WIDTH/61; // normalize to scale
+        point((width-PIANO_WIDTH)/2 + ((inAvg)*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
         stroke(255, 140, 0);
-        point((width-PIANO_WIDTH)/2 + (outAvg*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
+        point((width-PIANO_WIDTH)/2 + ((outAvg)*p_len), PIANO_HEIGHT + 1.1*whiteHeight); // scale, place beneath keyboard
         strokeWeight(1);
         stroke(0);
       }
@@ -99,13 +99,13 @@ class Keyboard {
    */
   void displayGraphic() {
     int totalVis = 3;
-    GPointsArray points = new GPointsArray(88);
-    GPointsArray pointsOut = new GPointsArray(88);
+    GPointsArray points = new GPointsArray(61);
+    GPointsArray pointsOut = new GPointsArray(61);
 
     // user input
     float maxPoint = 0.0;
     // updating graph
-    for (int i=0; i < 88; i++) {
+    for (int i=15; i < 76; i++) { // 61 key array 
       float thisInFreq = keyArray[i].getInProb();
       float thisOutFreq = keyArray[i].getOutProb();
 
@@ -193,14 +193,14 @@ class Keyboard {
     assert freq.length == keyArray.length;
     inAvg = 0.0;
 
-    for (int i=0; i<keyArray.length; i++) {
+    for (int i=15; i<76; i++) {
       if (post) {
         // do not normalize by notesStored if post analysis triggered
         keyArray[i].setInProb((((float) freq[i])/histIn.split("-").length)/2);
-        inAvg += i*((float) freq[i])/histIn.split("-").length;
+        inAvg += (i-15)*((float) freq[i])/histIn.split("-").length;
       } else {
         keyArray[i].setInProb((((float) freq[i])/notesStored)/2); // normalize to get 'empirical probability' distribution
-        inAvg += i*((float) freq[i])/notesStored;
+        inAvg += (i-15)*((float) freq[i])/notesStored;
       }
     }
   }
@@ -212,14 +212,14 @@ class Keyboard {
     assert freq.length == keyArray.length;
     outAvg = 0.0;
 
-    for (int i=0; i<keyArray.length; i++) {
+    for (int i=15; i<76; i++) {
       if (post) {
         // do not normalize by notesStored
         keyArray[i].setOutProb((((float) freq[i])/histOut.split("-").length)/2);
-        outAvg += i*(((float) freq[i])/histOut.split("-").length);
+        outAvg += (i-15)*(((float) freq[i])/histOut.split("-").length);
       } else {
         keyArray[i].setOutProb((((float) freq[i])/notesStored)/2); // normalize to get 'empirical probability' distribution
-        outAvg += i*(((float) freq[i])/notesStored);
+        outAvg += (i-15)*(((float) freq[i])/notesStored);
       }
     }
   }
@@ -250,7 +250,7 @@ class Keyboard {
 
       pushMatrix();
 
-      if (i == 1 || (i-1)%5 == 0 || (i-1)%5 == 2) {
+      if (i%5 == 2 || i%5 == 0 && i != 0) {
         offset += whiteWidth; // ensure correct position of 3rd black key
       }
 
